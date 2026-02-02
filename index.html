@@ -3,53 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Himalayan Escape - 20 Stages Edition</title>
+    <title>Himalayan Legend - 20 Stages</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
         #ui { position: absolute; top: 10px; width: 100%; text-align: center; color: white; pointer-events: none; z-index: 10; }
-        .bar { width: 220px; height: 12px; background: #333; margin: 5px auto; border-radius: 6px; border: 1px solid #555; }
-        #progress { width: 0%; height: 100%; background: linear-gradient(90deg, #00ff00, #00aa00); border-radius: 6px; transition: width 0.2s; }
-        #overlay { 
+        .bar-container { width: 70%; height: 12px; background: #333; margin: 8px auto; border-radius: 6px; border: 1px solid #444; }
+        #fill { width: 0%; height: 100%; background: linear-gradient(90deg, #27ae60, #2ecc71); border-radius: 6px; }
+        #screen { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.85); display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; color: white; z-index: 100; text-align: center;
+            background: rgba(0,0,0,0.9); display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; color: white; z-index: 1000; 
         }
         button { 
-            padding: 15px 40px; font-size: 22px; cursor: pointer; background: #27ae60; 
-            color: white; border: none; border-radius: 12px; font-weight: bold; margin-top: 15px;
-            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+            padding: 18px 45px; font-size: 24px; cursor: pointer; border-radius: 15px; 
+            border: none; background: #e67e22; color: white; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(230, 126, 34, 0.4); pointer-events: auto;
         }
-        .stats { font-size: 14px; color: #f1c40f; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div id="ui">
-    <div id="lvlTitle" style="font-size: 20px; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000;">المرحلة 1</div>
-    <div class="bar"><div id="progress"></div></div>
-    <div class="stats">المسافة: <span id="dist">1200</span>m | النقاط: <span id="score">0</span></div>
+    <div id="lvlName" style="font-size: 20px; font-weight: bold;">المرحلة 1: غابة الذئاب</div>
+    <div class="bar-container"><div id="fill"></div></div>
+    <div style="font-size: 14px; color: #f1c40f;">المسافة: <span id="dist">1000</span>m | النقاط: <span id="score">0</span></div>
 </div>
 
-<div id="overlay">
-    <h1 id="msg" style="margin: 10px;">مغامرة القطة الكبرى</h1>
-    <p id="subMsg" style="color: #bdc3c7;">استعد للهروب من الوحوش!</p>
-    <button id="btn" onclick="start()">ابدأ الرحلة 🐾</button>
+<div id="screen">
+    <h1 id="msg">مغامرة الـ 20 مرحلة</h1>
+    <p id="subMsg">ساعد القطة على الهروب من كافة الوحوش</p>
+    <button id="mainBtn" onclick="initGame()">ابدأ الرحلة 🐾</button>
 </div>
 
-<canvas id="c"></canvas>
+<canvas id="canvas"></canvas>
 
 <script>
-    const canvas = document.getElementById('c');
+    const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const overlay = document.getElementById('overlay');
+    const screen = document.getElementById('screen');
     const msg = document.getElementById('msg');
-    const btn = document.getElementById('btn');
+    const mainBtn = document.getElementById('mainBtn');
 
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.addEventListener('resize', resize); resize();
 
-    // روابط الأيقونات (استخدمت أيقونات متنوعة للوحوش الجديدة)
-    const I = {
+    const assets = {
         cat: 'https://img.icons8.com/color/96/cat--v1.png',
         wolf: 'https://img.icons8.com/color/150/wolf.png',
         ghost: 'https://img.icons8.com/color/150/ghost.png',
@@ -63,146 +61,131 @@
         cabin: 'https://img.icons8.com/color/200/log-cabin.png'
     };
 
-    const load = (src) => { let img = new Image(); img.src = src; return img; };
-    const imgs = { 
-        cat: load(I.cat), wolf: load(I.wolf), ghost: load(I.ghost), eagle: load(I.eagle), 
-        snake: load(I.snake), croc: load(I.croc), lion: load(I.lion), dragon: load(I.dragon),
-        alien: load(I.alien), fish: load(I.fish), cabin: load(I.cabin) 
-    };
+    const imgs = {};
+    for (let key in assets) { imgs[key] = new Image(); imgs[key].src = assets[key]; }
 
-    // تعريف الـ 20 مرحلة
+    // إعداد الـ 20 مرحلة بذكاء
     const stages = [
-        { name: "غابة الذئاب", monster: "wolf", bg: "#0a0a0a", col: "#f1c40f", speed: 5 },
-        { name: "مقبرة الأشباح", monster: "ghost", bg: "#1a0033", col: "#2ecc71", speed: 6 },
-        { name: "جبال النسور", monster: "eagle", bg: "#001a33", col: "#ecf0f1", speed: 7 },
-        { name: "وادي الأفاعي", monster: "snake", bg: "#0d1a0d", col: "#e67e22", speed: 8 },
-        { name: "نهر التماسيح", monster: "croc", bg: "#002b2b", col: "#1abc9c", speed: 9 },
-        { name: "عرين الأسد", monster: "lion", bg: "#2c1e00", col: "#d35400", speed: 10 },
-        { name: "كهف التنين", monster: "dragon", bg: "#1a0500", col: "#c0392b", speed: 11 },
-        { name: "كوكب الفضائيين", monster: "alien", bg: "#000022", col: "#9b59b6", speed: 12 },
-        { name: "ممر النمور", monster: "lion", bg: "#1e1e1e", col: "#f39c12", speed: 13 },
-        { name: "مستنقع الرعب", monster: "croc", bg: "#0e1a00", col: "#27ae60", speed: 14 },
-        // ... إضافة بقية المراحل مع زيادة السرعة والصعوبة
-        { name: "جحيم الوحوش", monster: "dragon", bg: "#3d0000", col: "#FF0000", speed: 15 },
-        { name: "السماء المظلمة", monster: "eagle", bg: "#00001a", col: "#3498db", speed: 16 },
-        { name: "نفق الأشباح", monster: "ghost", bg: "#000000", col: "#7f8c8d", speed: 17 },
-        { name: "غابة الصبار", monster: "snake", bg: "#1b2e1b", col: "#2ecc71", speed: 18 },
-        { name: "مختبر الفضاء", monster: "alien", bg: "#001f3f", col: "#01FF70", speed: 19 },
-        { name: "قمة الجبل", monster: "eagle", bg: "#2f4f4f", col: "#F0F8FF", speed: 20 },
-        { name: "جزيرة المفترسين", monster: "lion", bg: "#556b2f", col: "#DAA520", speed: 21 },
-        { name: "المنطقة المحظورة", monster: "dragon", bg: "#2b0000", col: "#8B0000", speed: 22 },
-        { name: "بوابة النجوم", monster: "alien", bg: "#191970", col: "#FFD700", speed: 23 },
-        { name: "المواجهة النهائية", monster: "dragon", bg: "#000000", col: "#FFFFFF", speed: 25 }
+        { n: "غابة الذئاب", m: "wolf", bg: "#0a0a0a", c: "#f1c40f", s: 5 },
+        { n: "مقبرة الأشباح", m: "ghost", bg: "#1a0033", c: "#9b59b6", s: 6 },
+        { n: "جبال النسور", m: "eagle", bg: "#001a33", c: "#ecf0f1", s: 7 },
+        { n: "وادي الأفاعي", m: "snake", bg: "#0d1a0d", c: "#2ecc71", s: 8 },
+        { n: "نهر التماسيح", m: "croc", bg: "#002b2b", c: "#1abc9c", s: 9 },
+        { n: "عرين الأسد", m: "lion", bg: "#2c1e00", c: "#e67e22", s: 10 },
+        { n: "منطقة الخطر", m: "wolf", bg: "#1e1e1e", c: "#e74c3c", s: 11 },
+        { n: "سماء الرعب", m: "eagle", bg: "#000022", c: "#3498db", s: 12 },
+        { n: "كهف التنين", m: "dragon", bg: "#1a0500", c: "#c0392b", s: 13 },
+        { n: "كوكب الفضائيين", m: "alien", bg: "#000000", c: "#2ecc71", s: 14 }
     ];
+    // توليد بقية المراحل تلقائياً لضمان العدد (20)
+    for(let i=10; i<20; i++) {
+        stages.push({
+            n: "المرحلة المتقدمة " + (i+1),
+            m: stages[i%stages.length].m,
+            bg: stages[i%stages.length].bg,
+            c: "#" + Math.floor(Math.random()*16777215).toString(16),
+            s: 14 + (i*0.5)
+        });
+    }
 
-    let cur = 0, score = 0, dist = 1200, active = false, jumping = false;
+    let cur = 0, score = 0, dist = 1000, active = false, gameStarted = false;
     let p = { x: 100, y: 0, w: 50, h: 50, v: 0 };
     let m = { x: -150, y: 0 };
     let obs = [], prizes = [], cabinX = -500;
 
-    window.start = () => {
-        overlay.style.display = 'none';
-        let s = stages[cur];
-        document.getElementById('lvlTitle').innerText = "مرحلة " + (cur+1) + ": " + s.name;
-        dist = 1200;
-        p.y = canvas.height/2; p.v = 0;
+    window.initGame = function() {
+        screen.style.display = "none";
+        const s = stages[cur];
+        document.getElementById('lvlName').innerText = `مرحلة ${cur+1}: ${s.n}`;
+        dist = 1000; p.y = canvas.height/2; p.v = 0;
         m.x = -150; m.y = canvas.height/2;
         obs = []; prizes = []; cabinX = -500;
-        active = true;
+        active = true; gameStarted = false;
     };
 
-    function die() {
-        active = false;
-        msg.innerText = "أمسك بك " + stages[cur].name + "!";
-        btn.innerText = "إعادة المحاولة";
-        overlay.style.display = 'flex';
-    }
+    function update() {
+        if (!active || !gameStarted) return;
+        const s = stages[cur];
+        p.v += 0.45; p.y += p.v;
+        dist -= s.s/10;
 
-    function loop() {
-        if (active) {
-            let s = stages[cur];
-            p.v += 0.45; p.y += p.v;
-            dist -= s.speed/10;
+        // ذكاء الوحش المتطور
+        if (s.m === "eagle" || s.m === "dragon") m.y += (p.y - 80 - m.y) * 0.1;
+        else if (s.m === "snake" || s.m === "alien") m.y = p.y + Math.sin(Date.now()/150)*80;
+        else m.y += (p.y - m.y) * 0.06;
+        m.x = Math.min(p.x - 110, m.x + 0.15);
 
-            // ذكاء الوحوش
-            if (s.monster === "eagle" || s.monster === "dragon") m.y += (p.y - 100 - m.y) * 0.1;
-            else if (s.monster === "snake" || s.monster === "alien") m.y = p.y + Math.sin(Date.now()/150)*70;
-            else m.y += (p.y - m.y) * 0.05;
-            
-            m.x = Math.min(p.x - 110, m.x + 0.15);
-
-            if (dist <= 0) {
-                if(cabinX === -500) cabinX = canvas.width;
-                cabinX -= s.speed;
-                if(p.x > cabinX + 100) {
-                    active = false;
-                    cur++;
-                    if(cur < stages.length) {
-                        msg.innerText = "تم اجتياز " + s.name + "! 🏡";
-                        btn.innerText = "دخول " + stages[cur].name;
-                    } else {
-                        msg.innerText = "🏆 أنت ملك الهروب! ختمت 20 مرحلة!";
-                        btn.innerText = "لعب من جديد";
-                        cur = 0; score = 0;
-                    }
-                    overlay.style.display = 'flex';
+        // الكوخ والانتقال
+        if (dist <= 0) {
+            if(cabinX === -500) cabinX = canvas.width;
+            cabinX -= s.s;
+            if(p.x > cabinX + 100) {
+                active = false;
+                cur++;
+                if(cur < stages.length) {
+                    msg.innerText = "أحسنت يا بطل! 🏡";
+                    mainBtn.innerText = "ابدأ مرحلة " + (cur+1);
+                } else {
+                    msg.innerText = "🏆 أسطورة الهروب!";
+                    mainBtn.innerText = "إعادة من الصفر";
+                    cur = 0; score = 0;
                 }
+                screen.style.display = "flex";
             }
-
-            if (dist > 100 && (obs.length === 0 || obs[obs.length-1].x < canvas.width - 350)) {
-                let h = Math.random() * (canvas.height - 350) + 50;
-                obs.push({ x: canvas.width, t: h, g: 250 - (cur * 3) }); // تضيق الفتحة مع تقدم المراحل
-                if(Math.random() > 0.7) prizes.push({ x: canvas.width + 50, y: h + 125 });
-            }
-
-            obs.forEach((o, i) => {
-                o.x -= s.speed;
-                if(p.x+35 > o.x && p.x+15 < o.x+60 && (p.y+15 < o.t || p.y+35 > o.t+o.g)) die();
-                if(o.x < -60) obs.splice(i, 1);
-            });
-
-            prizes.forEach((f, i) => {
-                f.x -= s.speed;
-                if(Math.hypot(p.x-f.x, p.y-f.y) < 45) { score += 100; prizes.splice(i, 1); }
-            });
-
-            if(p.y > canvas.height || p.y < 0 || p.x < m.x + 65) die();
-
-            document.getElementById('dist').innerText = Math.max(0, Math.floor(dist));
-            document.getElementById('score').innerText = score;
-            document.getElementById('progress').style.width = (1 - (dist/1200))*100 + "%";
         }
 
-        ctx.fillStyle = stages[cur].bg;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        if(cabinX > -500) ctx.drawImage(imgs.cabin, cabinX, canvas.height/2-100, 200, 200);
-        
-        let mImg = imgs[stages[cur].monster] || imgs.wolf;
-        ctx.drawImage(mImg, m.x, m.y, 110, 110);
-        
-        ctx.fillStyle = stages[cur].col;
-        obs.forEach(o => { 
-            ctx.shadowBlur = 10; ctx.shadowColor = stages[cur].col;
-            ctx.fillRect(o.x, 0, 60, o.t); 
-            ctx.fillRect(o.x, o.t+o.g, 60, canvas.height); 
-            ctx.shadowBlur = 0;
-        });
-        
-        prizes.forEach(f => ctx.drawImage(imgs.fish, f.x, f.y, 45, 45));
-        ctx.drawImage(imgs.cat, p.x, p.y, p.w, p.h);
+        // العقبات والجوائز
+        if (dist > 100 && (obs.length === 0 || obs[obs.length-1].x < canvas.width - 350)) {
+            let h = Math.random() * (canvas.height - 350) + 50;
+            obs.push({ x: canvas.width, t: h, g: 250 - (cur*2) });
+            if(Math.random() > 0.7) prizes.push({ x: canvas.width + 50, y: h + 125 });
+        }
 
-        requestAnimationFrame(loop);
+        obs.forEach((o, i) => {
+            o.x -= s.s;
+            if(p.x+35 > o.x && p.x+15 < o.x+60 && (p.y+15 < o.t || p.y+35 > o.t+o.g)) reset();
+            if(o.x < -60) obs.splice(i, 1);
+        });
+
+        prizes.forEach((f, i) => {
+            f.x -= s.s;
+            if(Math.hypot(p.x-f.x, p.y-f.y) < 45) { score += 100; prizes.splice(i, 1); }
+        });
+
+        if(p.y > canvas.height || p.y < 0 || p.x < m.x + 65) reset();
+
+        document.getElementById('dist').innerText = Math.max(0, Math.floor(dist));
+        document.getElementById('score').innerText = score;
+        document.getElementById('fill').style.width = (1 - (dist/1000))*100 + "%";
     }
 
-    const jump = (e) => { 
-        if(e.target.id === 'btn') return;
-        if(active) { p.v = -8.5; } 
-    };
-    window.addEventListener('mousedown', jump);
-    window.addEventListener('touchstart', (e) => { if(e.target.id !== 'btn') { e.preventDefault(); jump(e); } }, {passive: false});
+    function reset() {
+        active = false;
+        msg.innerText = "أمسك بك " + stages[cur].n;
+        mainBtn.innerText = "حاول مجدداً";
+        screen.style.display = "flex";
+    }
 
-    loop();
+    function draw() {
+        ctx.fillStyle = stages[cur].bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if(cabinX > -500) ctx.drawImage(imgs.cabin, cabinX, canvas.height/2-100, 200, 200);
+        ctx.drawImage(imgs[stages[cur].m] || imgs.wolf, m.x, m.y, 110, 110);
+        ctx.fillStyle = stages[cur].c;
+        obs.forEach(o => { ctx.fillRect(o.x, 0, 60, o.t); ctx.fillRect(o.x, o.t+o.g, 60, canvas.height); });
+        prizes.forEach(f => ctx.drawImage(imgs.fish, f.x, f.y, 45, 45));
+        ctx.drawImage(imgs.cat, p.x, p.y, p.w, p.h);
+        update(); requestAnimationFrame(draw);
+    }
+
+    const trigger = (e) => { 
+        if(e.target.id === 'mainBtn') return;
+        if(active) { gameStarted = true; p.v = -8.5; } 
+    };
+    window.addEventListener('mousedown', trigger);
+    window.addEventListener('touchstart', (e) => { if(e.target.id !== 'mainBtn') { e.preventDefault(); trigger(e); } }, {passive: false});
+
+    draw();
 </script>
 </body>
 </html>
